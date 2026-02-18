@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import String, Boolean, DateTime
+from sqlalchemy import String, Boolean, DateTime, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -10,13 +10,19 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)  # None = OAuth-only
     full_name: Mapped[str | None] = mapped_column(String(128))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="user")  # noqa: F821
     cars: Mapped[list["Car"]] = relationship(back_populates="owner")  # noqa: F821
+    oauth_accounts: Mapped[list["OAuthAccount"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # noqa: F821
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")  # noqa: F821
+    organized_events: Mapped[list["Event"]] = relationship(back_populates="organizer")  # noqa: F821
+    event_participations: Mapped[list["EventParticipant"]] = relationship(back_populates="user")  # noqa: F821

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Tracks — RaceTrace{% endblock %}
+{% block content %}
+<h1>Tracks</h1>
+<div id="tracks-container"><p>Loading…</p></div>
+{% endblock %}
+{% block scripts %}
+<script>
+fetch("/api/v1/tracks/").then(r=>r.json()).then(tracks => {
+  const el = document.getElementById("tracks-container");
+  if (!tracks.length) { el.innerHTML="<p>No tracks yet.</p>"; return; }
+  el.innerHTML = tracks.map(t => `
+    <div class="session-card">
+      <h3><a href="/tracks/${t.id}">${t.name}</a> <span class="muted">${t.country}</span></h3>
+      <div class="configs">
+        ${t.configurations.map(c => `<a href="/leaderboard/${c.id}" class="badge">${c.name}${c.length_meters ? " · "+c.length_meters+"m" : ""}</a>`).join(" ")}
+      </div>
+    </div>
+  `).join("");
+});
+</script>
+{% endblock %}

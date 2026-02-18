@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}My Sessions — RaceTrace{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>My Sessions</h1>
+  <button class="btn btn-primary" onclick="document.getElementById('upload-zone').style.display='block'">+ Upload Session</button>
+</div>
+
+<!-- Upload zone -->
+<div id="upload-zone" style="display:none" class="session-card" style="margin-bottom:1.5rem">
+  <h3>Upload Telemetry File</h3>
+  <p class="muted" style="margin-bottom:1rem">Select a TrackAddict CSV file. Laps will be imported automatically.</p>
+  <form id="upload-form">
+    <label style="display:flex;flex-direction:column;gap:.4rem;margin-bottom:1rem">
+      <span>Telemetry file</span>
+      <input type="file" id="u-file" accept=".csv,.json,.ld,.drk,.xdrk" required
+             style="color:var(--color-text);background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius);padding:.5rem" />
+    </label>
+    <div id="upload-progress" class="hidden muted">Uploading and processing…</div>
+    <div class="modal-actions">
+      <button type="submit" class="btn btn-primary">Upload</button>
+      <button type="button" class="btn btn-secondary" onclick="document.getElementById('upload-zone').style.display='none'">Cancel</button>
+    </div>
+  </form>
+</div>
+
+<div id="sessions-container"><p>Loading sessions…</p></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadSessions() {
+  const res = await fetch("/api/v1/sessions/", { headers: authHeaders() });
+  if (!res.ok) { window.location.href = "/login"; return; }
+  const sessions = await res.json();
+  const container = document.getElementById("sessions-container");
+  if (!sessions.length) {
+    container.innerHTML = '<p>No sessions yet. Upload your first telemetry file!</p>';
+    return;
+  }
+  container.innerHTML = sessions.map(s => `
+    <div class="session-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <h3><a href="/sessions/${s.id}">${s.session_type.charAt(0).toUpperCase()+s.session_type.slice(1)} — ${new Date(s.date).toLocaleDateString()}</a></h3>
+          <p class="muted">${s.vehicle_hint || "Unknown vehicle"} · ${s.app_source || ""} · ${s.is_public ? "🌐 Public" : "🔒 Private"}</p>
+        </div>
+        <a href="/sessions/${s.id}" class="btn btn-secondary btn-sm">View</a>
+      </div>
+    </div>
+  `).join("");
+}
+
+document.getElementById("upload-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const file = document.getElementById("u-file").files[0];
+  if (!file) return;
+  const progress = document.getElementById("upload-progress");
+  progress.classList.remove("hidden");
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch("/api/v1/sessions/upload", {
+    method: "POST",
+    headers: authHeaders(),
+    body: fd,
+  });
+  if (res.ok) {
+    const session = await res.json();
+    window.location.href = `/sessions/${session.id}`;
+  } else {
+    progress.classList.add("hidden");
+    const err = await res.json();
+    alert(err.detail || "Upload failed");
+  }
+});
+
+loadSessions();
+</script>
+{% endblock %}

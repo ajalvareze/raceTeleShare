@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}My Cars — RaceTrace{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>My Cars</h1>
+  <button class="btn btn-primary" onclick="openAdd()">+ Add Car</button>
+</div>
+
+<div id="cars-container"><p>Loading…</p></div>
+
+<!-- Add / Edit modal -->
+<dialog id="car-modal">
+  <form id="car-form">
+    <h2 id="modal-title">Add Car</h2>
+    <input type="hidden" id="c-id" />
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+      <label>Make <span style="color:var(--color-primary)">*</span>
+        <input type="text" id="c-make" required placeholder="Renault" />
+      </label>
+      <label>Model <span style="color:var(--color-primary)">*</span>
+        <input type="text" id="c-model" required placeholder="Clio Cup" />
+      </label>
+      <label>Year
+        <input type="number" id="c-year" placeholder="2022" min="1900" max="2100" />
+      </label>
+      <label>Category
+        <input type="text" id="c-category" placeholder="Touring, GT3, Formula…" />
+      </label>
+      <label>Drivetrain
+        <select id="c-drivetrain">
+          <option value="">—</option>
+          <option value="FWD">FWD</option>
+          <option value="RWD">RWD</option>
+          <option value="AWD">AWD</option>
+        </select>
+      </label>
+      <label>Power (hp)
+        <input type="number" id="c-power" placeholder="220" min="0" />
+      </label>
+      <label>Weight (kg)
+        <input type="number" id="c-weight" placeholder="1050" min="0" />
+      </label>
+      <label>Engine (cc)
+        <input type="number" id="c-engine" placeholder="1998" min="0" />
+      </label>
+    </div>
+    <label style="margin-top:.5rem">Notes
+      <textarea id="c-notes" rows="2" style="resize:vertical;padding:.5rem;border-radius:var(--radius);border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);font-size:.95rem"></textarea>
+    </label>
+    <div class="modal-actions">
+      <button type="submit" class="btn btn-primary">Save</button>
+      <button type="button" class="btn btn-secondary" onclick="document.getElementById('car-modal').close()">Cancel</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let editingId = null;
+
+async function loadCars() {
+  const res = await fetch("/api/v1/cars/", { headers: authHeaders() });
+  if (!res.ok) { window.location.href = "/login"; return; }
+  const cars = await res.json();
+  const container = document.getElementById("cars-container");
+  if (!cars.length) {
+    container.innerHTML = "<p>No cars yet. Add your first car!</p>";
+    return;
+  }
+  container.innerHTML = cars.map(c => `
+    <div class="session-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <h3>${c.make} ${c.model}${c.year ? ' ('+c.year+')' : ''}</h3>
+          <p class="muted">
+            ${c.category || ""}
+            ${c.drivetrain ? ' · '+c.drivetrain : ""}
+            ${c.power_hp ? ' · '+c.power_hp+' hp' : ""}
+            ${c.weight_kg ? ' · '+c.weight_kg+' kg' : ""}
+            ${c.engine_cc ? ' · '+c.engine_cc+' cc' : ""}
+          </p>
+          ${c.notes ? `<p style="margin-top:.25rem;font-size:.9rem">${c.notes}</p>` : ""}
+        </div>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-secondary btn-sm" onclick='openEdit(${JSON.stringify(c)})'>Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCar(${c.id})">Delete</button>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function openAdd() {
+  editingId = null;
+  document.getElementById("modal-title").textContent = "Add Car";
+  document.getElementById("car-form").reset();
+  document.getElementById("c-id").value = "";
+  document.getElementById("car-modal").showModal();
+}
+
+function openEdit(car) {
+  editingId = car.id;
+  document.getElementById("modal-title").textContent = "Edit Car";
+  document.getElementById("c-id").value = car.id;
+  document.getElementById("c-make").value = car.make;
+  document.getElementById("c-model").value = car.model;
+  document.getElementById("c-year").value = car.year || "";
+  document.getElementById("c-category").value = car.category || "";
+  document.getElementById("c-drivetrain").value = car.drivetrain || "";
+  document.getElementById("c-power").value = car.power_hp || "";
+  document.getElementById("c-weight").value = car.weight_kg || "";
+  document.getElementById("c-engine").value = car.engine_cc || "";
+  document.getElementById("c-notes").value = car.notes || "";
+  document.getElementById("car-modal").showModal();
+}
+
+document.getElementById("car-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const year = document.getElementById("c-year").value;
+  const power = document.getElementById("c-power").value;
+  const weight = document.getElementById("c-weight").value;
+  const engine = document.getElementById("c-engine").value;
+  const body = {
+    make: document.getElementById("c-make").value,
+    model: document.getElementById("c-model").value,
+    year: year ? parseInt(year) : null,
+    category: document.getElementById("c-category").value || null,
+    drivetrain: document.getElementById("c-drivetrain").value || null,
+    power_hp: power ? parseInt(power) : null,
+    weight_kg: weight ? parseInt(weight) : null,
+    engine_cc: engine ? parseInt(engine) : null,
+    notes: document.getElementById("c-notes").value || null,
+  };
+  const url = editingId ? `/api/v1/cars/${editingId}` : "/api/v1/cars/";
+  const method = editingId ? "PATCH" : "POST";
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (res.ok) {
+    document.getElementById("car-modal").close();
+    loadCars();
+  } else {
+    const err = await res.json();
+    alert(err.detail || "Save failed");
+  }
+});
+
+async function deleteCar(id) {
+  if (!confirm("Delete this car?")) return;
+  await fetch(`/api/v1/cars/${id}`, { method: "DELETE", headers: authHeaders() });
+  loadCars();
+}
+
+loadCars();
+</script>
+{% endblock %}

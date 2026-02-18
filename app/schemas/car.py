@@ -6,6 +6,10 @@ class CarBase(BaseModel):
     model: str
     year: int | None = None
     category: str | None = None
+    drivetrain: str | None = None
+    power_hp: int | None = None
+    weight_kg: int | None = None
+    engine_cc: int | None = None
     notes: str | None = None
 
 
@@ -18,6 +22,10 @@ class CarUpdate(BaseModel):
     model: str | None = None
     year: int | None = None
     category: str | None = None
+    drivetrain: str | None = None
+    power_hp: int | None = None
+    weight_kg: int | None = None
+    engine_cc: int | None = None
     notes: str | None = None
 
 

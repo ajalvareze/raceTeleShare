@@ -1,44 +1,163 @@
 {% extends "base.html" %}
-{% block title %}Lap {{ lap_id }} — RaceTrace{% endblock %}
+{% block title %}Lap Detail — RaceTrace{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  #map { height: 380px; border-radius: var(--radius); border: 1px solid var(--color-border); margin-bottom: 1.5rem; background: var(--color-surface); }
+  .telemetry-grid { display: grid; gap: 1.5rem; margin-top: 1.5rem; }
+  .channel-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1rem; }
+  .channel-card h3 { font-size: .85rem; color: var(--color-muted); margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="lap-detail">
-  <div id="lap-header"><p>Loading…</p></div>
-  <div class="chart-grid" id="chart-grid"></div>
-</div>
+<div id="lap-header"><p>Loading…</p></div>
+<div id="map" style="display:none"></div>
+<div id="telemetry-grid" class="telemetry-grid"></div>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<script src="/static/js/charts.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  const LAP_ID = {{ lap_id }};
+const LAP_ID = {{ lap_id }};
 
-  async function loadLap() {
-    const [lapRes, telRes] = await Promise.all([
-      fetch(`/api/v1/laps/${LAP_ID}`, { headers: authHeaders() }),
-      fetch(`/api/v1/laps/compare`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ lap_ids: [LAP_ID] }),
-      }),
-    ]);
+const CHANNEL_COLORS = {
+  speed_gps:  "#e63946",
+  speed_obd:  "#c1121f",
+  throttle:   "#2a9d8f",
+  brake:      "#e9c46a",
+  rpm:        "#457b9d",
+  accel_lat:  "#f4a261",
+  accel_lon:  "#a8dadc",
+  accel_vert: "#6d6875",
+};
 
-    const lap = await lapRes.json();
-    document.getElementById("lap-header").innerHTML = `
-      <h1>Lap ${lap.lap_number}</h1>
-      <p>Time: <strong>${lap.lap_time_display ?? "—"}</strong>
-         | Max speed: <strong>${lap.max_speed_kmh ? lap.max_speed_kmh.toFixed(1) + " km/h" : "—"}</strong>
-      </p>
-      <a href="/compare?laps=${LAP_ID}" class="btn btn-secondary">Compare with another lap</a>
-    `;
+const CHANNEL_LABELS = {
+  speed_gps:  "Speed GPS",
+  speed_obd:  "Speed OBD",
+  throttle:   "Throttle",
+  brake:      "Brake",
+  rpm:        "RPM",
+  accel_lat:  "Lateral G",
+  accel_lon:  "Longitudinal G",
+  accel_vert: "Vertical G",
+};
 
-    if (telRes.ok) {
-      const result = await telRes.json();
-      renderChannelCharts(result.laps[0], document.getElementById("chart-grid"));
-    }
+const CHANNEL_ORDER = ["speed_gps", "speed_obd", "throttle", "brake", "rpm", "accel_lat", "accel_lon", "accel_vert"];
+
+async function loadLap() {
+  const [lapRes, telRes] = await Promise.all([
+    fetch(`/api/v1/laps/${LAP_ID}`, { headers: authHeaders() }),
+    fetch(`/api/v1/laps/${LAP_ID}/telemetry`, { headers: authHeaders() }),
+  ]);
+
+  if (!lapRes.ok) {
+    document.getElementById("lap-header").innerHTML = "<p>Lap not found or access denied.</p>";
+    return;
   }
 
-  loadLap();
+  const lap = await lapRes.json();
+  document.getElementById("lap-header").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem">
+      <div>
+        <p class="muted" style="margin-bottom:.25rem"><a href="/sessions/${lap.session_id}">← Back to session</a></p>
+        <h1>Lap ${lap.lap_number}</h1>
+        <div style="display:flex;gap:1.5rem;margin-top:.5rem;flex-wrap:wrap">
+          <span><strong>Time:</strong> ${lap.lap_time_display || "—"}</span>
+          <span><strong>Max speed:</strong> ${lap.max_speed_kmh ? lap.max_speed_kmh.toFixed(1)+' km/h' : '—'}</span>
+          <span><strong>Avg speed:</strong> ${lap.avg_speed_kmh ? lap.avg_speed_kmh.toFixed(1)+' km/h' : '—'}</span>
+        </div>
+        <div style="margin-top:.5rem;display:flex;gap:.5rem">
+          ${lap.is_outlap ? '<span class="badge">Out lap</span>' : ""}
+          ${lap.is_inlap ? '<span class="badge">In lap</span>' : ""}
+          ${!lap.is_valid ? '<span class="badge badge-warn">Invalid</span>' : ""}
+        </div>
+      </div>
+      <a href="/compare?laps=${LAP_ID}" class="btn btn-secondary btn-sm">Compare</a>
+    </div>
+  `;
+
+  if (!telRes.ok) {
+    document.getElementById("telemetry-grid").innerHTML = "<p class='muted'>Telemetry data not yet available.</p>";
+    return;
+  }
+
+  const tel = await telRes.json();
+  renderMap(tel.gps_track);
+  renderCharts(tel.channels);
+}
+
+function renderMap(gpsTrack) {
+  if (!gpsTrack || gpsTrack.length < 2) return;
+  const mapEl = document.getElementById("map");
+  mapEl.style.display = "block";
+
+  const latlngs = gpsTrack.map(p => [p[1], p[2]]);
+  const map = L.map("map");
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap contributors"
+  }).addTo(map);
+
+  const poly = L.polyline(latlngs, { color: "#e63946", weight: 3, opacity: 0.85 }).addTo(map);
+  map.fitBounds(poly.getBounds(), { padding: [20, 20] });
+
+  L.circleMarker(latlngs[0], { radius: 8, color: "#2a9d8f", fillColor: "#2a9d8f", fillOpacity: 1 })
+    .bindPopup("Start / Finish").addTo(map);
+}
+
+function renderCharts(channels) {
+  const grid = document.getElementById("telemetry-grid");
+  grid.innerHTML = "";
+
+  const sorted = [...channels].sort((a, b) => {
+    const ai = CHANNEL_ORDER.indexOf(a.name);
+    const bi = CHANNEL_ORDER.indexOf(b.name);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  sorted.forEach(ch => {
+    const card = document.createElement("div");
+    card.className = "channel-card";
+    const label = CHANNEL_LABELS[ch.name] || ch.name;
+    const unit = ch.unit || "";
+    card.innerHTML = `<h3>${label}${unit ? " ("+unit+")" : ""}</h3><canvas></canvas>`;
+    grid.appendChild(card);
+
+    new Chart(card.querySelector("canvas"), {
+      type: "line",
+      data: {
+        labels: ch.timestamps,
+        datasets: [{
+          data: ch.data,
+          borderColor: CHANNEL_COLORS[ch.name] || "#7a7d90",
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.1,
+        }],
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            type: "linear",
+            title: { display: true, text: "Time (s)", color: "#7a7d90" },
+            ticks: { maxTicksLimit: 12, color: "#7a7d90" },
+            grid: { color: "#2a2d3a" },
+          },
+          y: {
+            ticks: { color: "#7a7d90" },
+            grid: { color: "#2a2d3a" },
+          },
+        },
+      },
+    });
+  });
+}
+
+loadLap();
 </script>
 {% endblock %}

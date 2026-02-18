@@ -9,8 +9,9 @@ from app.models.lap import Lap
 from app.models.session import Session
 from app.models.user import User
 from app.schemas.lap import LapCreate, LapOut, LapCompareRequest
-from app.schemas.telemetry import CompareResult
+from app.schemas.telemetry import CompareResult, TelemetryData, TelemetryChannel
 from app.services.storage import save_telemetry_file
+from app.services.telemetry.parser import parse
 from app.services.telemetry.processor import extract_lap_summary
 from app.services.telemetry.comparator import compare_laps
 
@@ -39,6 +40,45 @@ def list_laps(
         .filter(Lap.session_id == session_id)
         .order_by(Lap.lap_number)
         .all()
+    )
+
+
+@router.get("/{lap_id}/telemetry", response_model=TelemetryData)
+def get_lap_telemetry(
+    lap_id: int,
+    db: DbSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    lap = db.get(Lap, lap_id)
+    if not lap:
+        raise HTTPException(status_code=404, detail="Lap not found")
+    _assert_session_access(db.get(Session, lap.session_id), current_user)
+
+    if not lap.telemetry_file_path or not lap.telemetry_format:
+        raise HTTPException(status_code=404, detail="No telemetry data for this lap")
+
+    all_laps = parse(lap.telemetry_file_path, lap.telemetry_format)
+    lap_data = next((d for d in all_laps if d["lap_number"] == lap.lap_number), None)
+    if not lap_data and all_laps:
+        lap_data = all_laps[0]
+    if not lap_data:
+        raise HTTPException(status_code=404, detail="Lap not found in telemetry file")
+
+    channels = [
+        TelemetryChannel(
+            name=name,
+            unit=ch.get("unit"),
+            data=ch["data"],
+            timestamps=ch["timestamps"],
+        )
+        for name, ch in lap_data["channels"].items()
+    ]
+    return TelemetryData(
+        lap_id=lap.id,
+        lap_time_ms=lap.lap_time_ms,
+        sample_rate_hz=lap_data.get("sample_rate_hz"),
+        channels=channels,
+        gps_track=lap.gps_track or lap_data.get("gps_track"),
     )
 
 

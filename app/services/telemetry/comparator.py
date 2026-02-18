@@ -15,7 +15,13 @@ def compare_laps(laps: list[Lap], channels: list[str] | None = None) -> CompareR
     for lap in laps:
         if not lap.telemetry_file_path or not lap.telemetry_format:
             raise ValueError(f"Lap {lap.id} has no telemetry data uploaded")
-        parsed.append(parse(lap.telemetry_file_path, lap.telemetry_format))
+        all_lap_data = parse(lap.telemetry_file_path, lap.telemetry_format)
+        lap_data = next((d for d in all_lap_data if d["lap_number"] == lap.lap_number), None)
+        if lap_data is None and all_lap_data:
+            lap_data = all_lap_data[0]
+        if lap_data is None:
+            raise ValueError(f"Lap {lap.id} not found in telemetry file")
+        parsed.append(lap_data)
 
     # Determine common channels
     channel_sets = [set(p["channels"].keys()) for p in parsed]

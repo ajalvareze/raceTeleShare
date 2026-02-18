@@ -1,28 +1,64 @@
 {% extends "base.html" %}
 {% block title %}RaceTrace — Racing Telemetry Platform{% endblock %}
-
 {% block content %}
 <section class="hero">
-  <h1>RaceTrace</h1>
-  <p>Upload, share, and compare telemetry data from your racing sessions.</p>
+  <h1>How fast are you?</h1>
+  <p>Upload your lap. See where you stand. Compare with the best.</p>
   <div class="hero-actions">
-    <a href="/register" class="btn btn-primary">Get Started</a>
-    <a href="/laps" class="btn btn-secondary">Browse Laps</a>
+    <a href="/register" class="btn btn-primary">Create account</a>
+    <a href="/tracks" class="btn btn-secondary">Browse tracks</a>
+  </div>
+</section>
+
+<section class="home-grid">
+  <div class="home-section">
+    <h2>🏁 Active Events</h2>
+    <div id="events-list"><p class="muted">Loading…</p></div>
+    <a href="/events" class="link-all">See all events →</a>
+  </div>
+  <div class="home-section">
+    <h2>🔥 Top Laps This Week</h2>
+    <div id="top-laps"><p class="muted">Loading…</p></div>
+  </div>
+  <div class="home-section">
+    <h2>📍 Popular Tracks</h2>
+    <div id="tracks-list"><p class="muted">Loading…</p></div>
+    <a href="/tracks" class="link-all">All tracks →</a>
   </div>
 </section>
 
 <section class="features">
-  <div class="feature-card">
-    <h2>Upload</h2>
-    <p>Support for CSV, JSON, MoTeC .ld, and AiM .drk telemetry formats.</p>
-  </div>
-  <div class="feature-card">
-    <h2>Share</h2>
-    <p>Make sessions public and share your fastest laps with the community.</p>
-  </div>
-  <div class="feature-card">
-    <h2>Compare</h2>
-    <p>Overlay channels, visualise delta-T graphs, and find where time is gained or lost.</p>
-  </div>
+  <div class="feature-card"><h3>Upload</h3><p>TrackAddict CSV out of the box. MoTeC &amp; AiM coming soon.</p></div>
+  <div class="feature-card"><h3>Share</h3><p>Make sessions public and share your fastest laps with the community.</p></div>
+  <div class="feature-card"><h3>Compare</h3><p>Overlay speed, throttle &amp; brake traces. Find where the lap time is lost.</p></div>
+  <div class="feature-card"><h3>Compete</h3><p>Join trackday events and fight for the top of the leaderboard.</p></div>
 </section>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadHome() {
+  const [evRes, lbRes] = await Promise.all([
+    fetch("/api/v1/events/"),
+    fetch("/api/v1/leaderboard/"),
+  ]);
+  const events = evRes.ok ? await evRes.json() : [];
+  const tracks  = lbRes.ok ? await lbRes.json() : [];
+
+  const evEl = document.getElementById("events-list");
+  evEl.innerHTML = events.length
+    ? events.slice(0,3).map(e => `<div class="card-row"><a href="/events/${e.id}">${e.name}</a><span class="badge">${e.status}</span></div>`).join("")
+    : "<p class='muted'>No active events right now.</p>";
+
+  const trEl = document.getElementById("tracks-list");
+  trEl.innerHTML = tracks.length
+    ? tracks.slice(0,5).map(t => `<div class="card-row"><a href="/leaderboard/${t.configuration_id}">${t.track_name} — ${t.configuration_name}</a><span class="muted">${t.best_lap_display ?? ""}</span></div>`).join("")
+    : "<p class='muted'>No public sessions yet.</p>";
+
+  const tlEl = document.getElementById("top-laps");
+  tlEl.innerHTML = tracks.length
+    ? tracks.slice(0,5).map(t => `<div class="card-row"><span>${t.track_name}</span><strong>${t.best_lap_display ?? "—"}</strong></div>`).join("")
+    : "<p class='muted'>—</p>";
+}
+loadHome();
+</script>
 {% endblock %}

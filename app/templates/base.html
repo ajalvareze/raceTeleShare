@@ -11,12 +11,15 @@
   <nav class="navbar">
     <a class="nav-brand" href="/">RaceTrace</a>
     <ul class="nav-links">
-      <li><a href="/laps">Laps</a></li>
-      <li><a href="/compare">Compare</a></li>
+      <li><a href="/tracks">Tracks</a></li>
+      <li><a href="/events">Events</a></li>
+      <li><a href="/sessions" id="nav-sessions" style="display:none">My Sessions</a></li>
+      <li><a href="/cars" id="nav-cars" style="display:none">My Cars</a></li>
+      <li><a href="/admin" id="nav-admin" style="display:none">Admin</a></li>
     </ul>
     <div class="nav-auth" id="nav-auth">
-      <a href="/login">Login</a>
-      <a href="/register">Register</a>
+      <a href="/login" class="btn btn-secondary btn-sm">Login</a>
+      <a href="/register" class="btn btn-primary btn-sm">Sign up</a>
     </div>
   </nav>
 
@@ -25,19 +28,37 @@
   </main>
 
   <script>
-    // Inject stored token into nav if present
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      const authEl = document.getElementById("nav-auth");
-      authEl.innerHTML = '<button onclick="logout()">Logout</button>';
+    const _token = localStorage.getItem("access_token");
+    if (_token) {
+      document.getElementById("nav-auth").innerHTML =
+        '<button class="btn btn-secondary btn-sm" onclick="logout()">Logout</button>';
+      ["nav-sessions", "nav-cars"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = "";
+      });
+      // Show admin link only for admins (check token claim)
+      try {
+        const payload = JSON.parse(atob(_token.split(".")[1]));
+        if (payload.role === "admin" || payload.is_superuser) {
+          const adminEl = document.getElementById("nav-admin");
+          if (adminEl) adminEl.style.display = "";
+        }
+      } catch (_) {}
     }
     function logout() {
+      fetch("/api/v1/auth/logout", { method: "POST" });
       localStorage.removeItem("access_token");
       window.location.href = "/";
     }
     function authHeaders() {
       const t = localStorage.getItem("access_token");
       return t ? { "Authorization": "Bearer " + t } : {};
+    }
+    function fmtMs(ms) {
+      if (!ms) return "—";
+      const m = Math.floor(ms / 60000);
+      const s = ((ms % 60000) / 1000).toFixed(3).padStart(6, "0");
+      return `${m}:${s}`;
     }
   </script>
   {% block scripts %}{% endblock %}

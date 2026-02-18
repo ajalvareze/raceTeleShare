@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Admin — RaceTrace{% endblock %}
+{% block content %}
+<h1>Admin Dashboard</h1>
+<div id="stats" class="features" style="margin-bottom:2rem"></div>
+
+<div class="admin-grid">
+  <div>
+    <h2>Users</h2>
+    <div id="users-list"></div>
+  </div>
+  <div>
+    <h2>Recent Sessions</h2>
+    <div id="sessions-list"></div>
+  </div>
+</div>
+
+<div style="margin-top:2rem">
+  <h2>Tracks</h2>
+  <div id="tracks-list"></div>
+</div>
+
+<!-- Track edit modal -->
+<dialog id="track-modal">
+  <form id="track-form">
+    <h2>Edit Track</h2>
+    <input type="hidden" id="t-id" />
+    <label>Name <input type="text" id="t-name" required /></label>
+    <label>Country <input type="text" id="t-country" /></label>
+    <label>City <input type="text" id="t-city" /></label>
+    <div class="modal-actions">
+      <button type="submit" class="btn btn-primary">Save</button>
+      <button type="button" class="btn btn-secondary" onclick="document.getElementById('track-modal').close()">Cancel</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadAdmin() {
+  const headers = authHeaders();
+  const [dashRes, usersRes, sessRes, tracksRes] = await Promise.all([
+    fetch("/api/v1/admin/dashboard", { headers }),
+    fetch("/api/v1/admin/users", { headers }),
+    fetch("/api/v1/admin/sessions", { headers }),
+    fetch("/api/v1/admin/tracks", { headers }),
+  ]);
+  if (dashRes.status === 403) { document.body.innerHTML="<p style='padding:2rem'>Access denied.</p>"; return; }
+
+  const dash = await dashRes.json();
+  document.getElementById("stats").innerHTML = [
+    ["Users", dash.users], ["Sessions", dash.sessions],
+    ["Laps", dash.laps], ["Public Sessions", dash.public_sessions], ["Events", dash.events]
+  ].map(([k,v]) => `<div class="feature-card"><h3>${v}</h3><p>${k}</p></div>`).join("");
+
+  const users = await usersRes.json();
+  document.getElementById("users-list").innerHTML = users.map(u => `
+    <div class="lap-row" style="flex-wrap:wrap">
+      <span>${u.username}</span><span class="muted">${u.email}</span>
+      <span class="badge">${u.is_superuser ? "admin" : "user"}</span>
+      <span class="badge ${u.is_active ? "" : "badge-warn"}">${u.is_active ? "active" : "inactive"}</span>
+      <button class="btn btn-sm" onclick="deactivate(${u.id})">Suspend</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Delete</button>
+    </div>
+  `).join("");
+
+  const sessions = await sessRes.json();
+  document.getElementById("sessions-list").innerHTML = sessions.map(s => `
+    <div class="lap-row">
+      <span>#${s.id}</span><span>${s.vehicle_hint || "—"}</span>
+      <span class="muted">${new Date(s.date).toLocaleDateString()}</span>
+      <a href="/sessions/${s.id}" class="btn btn-sm btn-secondary">View</a>
+      <button class="btn btn-sm btn-danger" onclick="deleteSession(${s.id})">Delete</button>
+    </div>
+  `).join("");
+
+  const tracks = tracksRes.ok ? await tracksRes.json() : [];
+  document.getElementById("tracks-list").innerHTML = tracks.length
+    ? tracks.map(t => `
+      <div class="lap-row">
+        <span><strong>${t.name}</strong></span>
+        <span class="muted">${t.country || ""}${t.city ? ' · '+t.city : ''}</span>
+        <a href="/tracks/${t.id}" class="btn btn-sm btn-secondary">View</a>
+        <button class="btn btn-sm" onclick='openTrackEdit(${JSON.stringify(t)})'>Edit</button>
+      </div>
+    `).join("")
+    : "<p class='muted'>No tracks yet.</p>";
+}
+
+function openTrackEdit(t) {
+  document.getElementById("t-id").value = t.id;
+  document.getElementById("t-name").value = t.name;
+  document.getElementById("t-country").value = t.country || "";
+  document.getElementById("t-city").value = t.city || "";
+  document.getElementById("track-modal").showModal();
+}
+
+document.getElementById("track-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("t-id").value;
+  const res = await fetch(`/api/v1/admin/tracks/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      name: document.getElementById("t-name").value,
+      country: document.getElementById("t-country").value || null,
+      city: document.getElementById("t-city").value || null,
+    }),
+  });
+  if (res.ok) {
+    document.getElementById("track-modal").close();
+    loadAdmin();
+  }
+});
+
+async function deactivate(id) {
+  if (!confirm("Suspend this user?")) return;
+  await fetch(`/api/v1/admin/users/${id}/deactivate`, { method:"PATCH", headers: authHeaders() });
+  loadAdmin();
+}
+async function deleteUser(id) {
+  if (!confirm("Permanently delete this user and all their data?")) return;
+  await fetch(`/api/v1/admin/users/${id}`, { method:"DELETE", headers: authHeaders() });
+  loadAdmin();
+}
+async function deleteSession(id) {
+  if (!confirm("Delete this session?")) return;
+  await fetch(`/api/v1/admin/sessions/${id}`, { method:"DELETE", headers: authHeaders() });
+  loadAdmin();
+}
+
+loadAdmin();
+</script>
+{% endblock %}

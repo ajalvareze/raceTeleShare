@@ -1,6 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Compare Laps — RaceTrace{% endblock %}
 
+{% block head %}
+<style>
+  .compare-channel-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; }
+  .compare-channel-card h3 { font-size: .85rem; color: var(--color-muted); margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+  .lap-legend { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1.5rem; }
+  .legend-item { display: flex; align-items: center; gap: .4rem; font-size: .9rem; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .delta-positive { color: #e9c46a; }
+  .delta-negative { color: #2a9d8f; }
+</style>
+{% endblock %}
+
 {% block content %}
 <h1>Compare Laps</h1>
 
@@ -11,23 +23,188 @@
   <button class="btn btn-primary" onclick="runCompare()">Compare</button>
 </div>
 
-<div id="delta-chart-wrap" class="hidden">
-  <h2>Delta-T</h2>
-  <canvas id="delta-canvas"></canvas>
+<div id="results" style="display:none">
+  <div class="lap-legend" id="legend"></div>
+
+  <div class="compare-channel-card">
+    <h3>Delta-T — time gained/lost vs reference lap</h3>
+    <p class="muted" style="font-size:.8rem;margin-bottom:.5rem">Positive = slower than reference · Negative = faster</p>
+    <canvas id="delta-canvas" height="100"></canvas>
+  </div>
+
+  <div id="channel-charts"></div>
 </div>
 
-<div id="channel-charts" class="chart-grid"></div>
+<div id="error-msg" style="display:none" class="muted"></div>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<script src="/static/js/charts.js"></script>
-<script src="/static/js/compare.js"></script>
 <script>
-  // Pre-fill from query string
-  const params = new URLSearchParams(location.search);
-  if (params.get("laps")) {
-    document.getElementById("lap-ids-input").value = params.get("laps");
+const LAP_COLORS = ["#e63946", "#457b9d", "#2a9d8f", "#e9c46a", "#f4a261", "#a8dadc"];
+
+const CHANNEL_ORDER = ["speed_gps", "speed_obd", "throttle", "brake", "rpm", "accel_lat", "accel_lon"];
+const CHANNEL_LABELS = {
+  speed_gps: "Speed GPS (km/h)", speed_obd: "Speed OBD (km/h)",
+  throttle: "Throttle (%)", brake: "Brake",
+  rpm: "RPM", accel_lat: "Lateral G", accel_lon: "Longitudinal G",
+};
+
+let deltaChart = null;
+const channelCharts = {};
+
+// Pre-fill from query string
+const params = new URLSearchParams(location.search);
+if (params.get("laps")) {
+  document.getElementById("lap-ids-input").value = params.get("laps");
+  // Auto-run if lap IDs are pre-filled
+  window.addEventListener("DOMContentLoaded", () => runCompare());
+}
+
+async function runCompare() {
+  const raw = document.getElementById("lap-ids-input").value.trim();
+  const lapIds = raw.split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+  if (lapIds.length < 2) { showError("Enter at least 2 lap IDs to compare."); return; }
+
+  const res = await fetch("/api/v1/laps/compare", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ lap_ids: lapIds }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    showError(err.detail || "Compare failed. Make sure the laps have telemetry data.");
+    return;
   }
+
+  const data = await res.json();
+  hideError();
+  renderResults(data, lapIds);
+}
+
+function showError(msg) {
+  document.getElementById("results").style.display = "none";
+  const el = document.getElementById("error-msg");
+  el.style.display = "block";
+  el.textContent = msg;
+}
+function hideError() {
+  document.getElementById("error-msg").style.display = "none";
+}
+
+function renderResults(data, lapIds) {
+  document.getElementById("results").style.display = "block";
+
+  // Legend
+  document.getElementById("legend").innerHTML = data.laps.map((lap, i) => `
+    <div class="legend-item">
+      <div class="legend-dot" style="background:${LAP_COLORS[i % LAP_COLORS.length]}"></div>
+      Lap ${lap.lap_id} — ${fmtMs(lap.lap_time_ms)}
+      ${i === 0 ? ' <span class="muted">(reference)</span>' : ""}
+    </div>
+  `).join("");
+
+  // Delta-T chart
+  if (data.deltas && data.deltas.length > 0) {
+    if (deltaChart) { deltaChart.destroy(); deltaChart = null; }
+    deltaChart = new Chart(document.getElementById("delta-canvas"), {
+      type: "line",
+      data: {
+        labels: data.deltas[0].timestamps.map(t => t.toFixed(2)),
+        datasets: data.deltas.map((d, i) => ({
+          label: `Lap ${d.comparison_lap_id} vs ${d.reference_lap_id}`,
+          data: d.delta_seconds,
+          borderColor: LAP_COLORS[(i + 1) % LAP_COLORS.length],
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.1,
+          fill: false,
+        })),
+      },
+      options: {
+        animation: false,
+        plugins: {
+          legend: { labels: { color: "#e0e0e8" } },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y > 0 ? "+" : ""}${ctx.parsed.y.toFixed(3)}s`,
+            },
+          },
+        },
+        scales: {
+          x: { ticks: { maxTicksLimit: 12, color: "#7a7d90" }, grid: { color: "#2a2d3a" } },
+          y: {
+            title: { display: true, text: "Delta (s)", color: "#7a7d90" },
+            ticks: { color: "#7a7d90" },
+            grid: { color: "#2a2d3a" },
+          },
+        },
+      },
+    });
+  }
+
+  // Channel charts — one chart per channel, multiple laps overlaid
+  const container = document.getElementById("channel-charts");
+  container.innerHTML = "";
+
+  // Collect all channel names, sorted by priority
+  const allChannels = [...new Set(data.laps.flatMap(l => l.channels.map(c => c.name)))]
+    .sort((a, b) => {
+      const ai = CHANNEL_ORDER.indexOf(a);
+      const bi = CHANNEL_ORDER.indexOf(b);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+
+  allChannels.forEach(chName => {
+    // Build datasets from all laps that have this channel
+    const datasets = data.laps.flatMap((lap, i) => {
+      const ch = lap.channels.find(c => c.name === chName);
+      if (!ch) return [];
+      return [{
+        label: `Lap ${lap.lap_id}`,
+        data: ch.data,
+        borderColor: LAP_COLORS[i % LAP_COLORS.length],
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0.1,
+      }];
+    });
+    if (!datasets.length) return;
+
+    const refCh = data.laps[0].channels.find(c => c.name === chName);
+    const timestamps = refCh ? refCh.timestamps : [];
+
+    const card = document.createElement("div");
+    card.className = "compare-channel-card";
+    const label = CHANNEL_LABELS[chName] || chName;
+    card.innerHTML = `<h3>${label}</h3><canvas></canvas>`;
+    container.appendChild(card);
+
+    new Chart(card.querySelector("canvas"), {
+      type: "line",
+      data: {
+        labels: timestamps.map(t => t.toFixed(2)),
+        datasets,
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        plugins: { legend: { labels: { color: "#e0e0e8" } } },
+        scales: {
+          x: {
+            title: { display: true, text: "Time (s)", color: "#7a7d90" },
+            ticks: { maxTicksLimit: 12, color: "#7a7d90" },
+            grid: { color: "#2a2d3a" },
+          },
+          y: {
+            ticks: { color: "#7a7d90" },
+            grid: { color: "#2a2d3a" },
+          },
+        },
+      },
+    });
+  });
+}
 </script>
 {% endblock %}

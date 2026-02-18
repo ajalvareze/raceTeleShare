@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Track — RaceTrace{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  .config-map { height: 320px; border-radius: var(--radius); border: 1px solid var(--color-border); margin: .75rem 0; background: var(--color-bg); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="track-header"><p>Loading…</p></div>
+<div id="configs"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const TRACK_ID = {{ track_id }};
+
+fetch(`/api/v1/tracks/${TRACK_ID}`).then(r => r.json()).then(t => {
+  document.getElementById("track-header").innerHTML = `
+    <h1>${t.name} <span class="muted">${t.country}${t.city ? ' · '+t.city : ''}</span></h1>
+    <p class="muted" style="margin-bottom:1.5rem">${t.configurations.length} configuration${t.configurations.length!==1?'s':''}</p>
+  `;
+
+  document.getElementById("configs").innerHTML = t.configurations.map((c, i) => `
+    <div class="session-card" style="margin-bottom:1.5rem">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3>${c.name} ${c.length_meters ? '· '+c.length_meters+' m' : ''} ${c.num_sectors ? '· '+c.num_sectors+' sectors' : ''}</h3>
+          ${c.is_default ? '<span class="badge badge-active">Default</span>' : ''}
+        </div>
+        <a href="/leaderboard/${c.id}" class="btn btn-primary btn-sm">Leaderboard</a>
+      </div>
+      <div id="map-${c.id}" class="config-map" style="${c.best_lap_gps ? '' : 'display:none'}"></div>
+      ${!c.best_lap_gps ? '<p class="muted" style="margin-top:.5rem;font-size:.85rem">No public lap data yet — track map will appear here after the first public session.</p>' : ''}
+    </div>
+  `).join("");
+
+  // Render a Leaflet map for each configuration that has GPS data
+  t.configurations.forEach(c => {
+    if (!c.best_lap_gps || c.best_lap_gps.length < 2) return;
+    const latlngs = c.best_lap_gps.map(p => [p[1], p[2]]);
+    const map = L.map(`map-${c.id}`);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors"
+    }).addTo(map);
+    const poly = L.polyline(latlngs, { color: "#e63946", weight: 3, opacity: 0.85 }).addTo(map);
+    map.fitBounds(poly.getBounds(), { padding: [20, 20] });
+    L.circleMarker(latlngs[0], { radius: 7, color: "#2a9d8f", fillColor: "#2a9d8f", fillOpacity: 1 })
+      .bindPopup("Start / Finish").addTo(map);
+  });
+});
+</script>
+{% endblock %}

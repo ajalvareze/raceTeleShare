@@ -81,3 +81,31 @@ form input:focus { outline: 2px solid var(--color-primary); }
 dialog { background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 2rem; min-width: 380px; }
 dialog h2 { margin-bottom: 1.25rem; }
 .modal-actions { display: flex; gap: .75rem; margin-top: 1rem; }
+
+/* ── Home grid ────────────────────────────────────────────── */
+.home-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 3rem; }
+.home-section { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1.5rem; }
+.home-section h2 { margin-bottom: 1rem; font-size: 1rem; text-transform: uppercase; letter-spacing: .05em; color: var(--color-muted); }
+.card-row { display: flex; justify-content: space-between; align-items: center; padding: .4rem 0; border-bottom: 1px solid var(--color-border); font-size: .9rem; }
+.link-all { display: inline-block; margin-top: .75rem; font-size: .85rem; }
+.muted { color: var(--color-muted); }
+
+/* ── Badges ──────────────────────────────────────────────── */
+.badge { display: inline-block; padding: .2rem .6rem; border-radius: 999px; font-size: .75rem; font-weight: 600; background: var(--color-border); color: var(--color-text); }
+.badge-active  { background: #2a9d8f22; color: #2a9d8f; border: 1px solid #2a9d8f; }
+.badge-upcoming { background: #e9c46a22; color: #e9c46a; border: 1px solid #e9c46a; }
+.badge-completed { background: var(--color-border); color: var(--color-muted); }
+.badge-warn { background: #e6394622; color: var(--color-primary); }
+.configs { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+
+/* ── Leaderboard table ───────────────────────────────────── */
+.lb-table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+.lb-table th { text-align: left; padding: .5rem .75rem; color: var(--color-muted); font-size: .8rem; text-transform: uppercase; border-bottom: 1px solid var(--color-border); }
+.lb-table td { padding: .6rem .75rem; border-bottom: 1px solid var(--color-border); font-size: .9rem; }
+.lb-table tr:hover td { background: var(--color-surface); }
+
+/* ── Admin ───────────────────────────────────────────────── */
+.admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem; }
+.btn-sm { padding: .3rem .75rem; font-size: .8rem; }
+.btn-danger { background: #7a1a22; color: #fff; }
+.btn-danger:hover { background: var(--color-primary); }

@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Session — RaceTrace{% endblock %}
+
+{% block content %}
+<div id="session-header"><p>Loading…</p></div>
+
+<!-- Edit form (hidden by default) -->
+<dialog id="edit-modal">
+  <form id="edit-form">
+    <h2>Edit Session</h2>
+    <label>Session type
+      <select id="e-type">
+        <option value="practice">Practice</option>
+        <option value="qualifying">Qualifying</option>
+        <option value="race">Race</option>
+        <option value="hotlap">Hotlap</option>
+      </select>
+    </label>
+    <label>Car
+      <select id="e-car"><option value="">— None —</option></select>
+    </label>
+    <label>Notes
+      <textarea id="e-notes" rows="3" style="resize:vertical;padding:.5rem;border-radius:var(--radius);border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);font-size:.95rem"></textarea>
+    </label>
+    <label style="flex-direction:row;align-items:center;gap:.5rem">
+      <input type="checkbox" id="e-public" style="width:auto" />
+      Make session public
+    </label>
+    <div class="modal-actions">
+      <button type="submit" class="btn btn-primary">Save</button>
+      <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-modal').close()">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="laps-section" class="hidden">
+  <div class="page-header">
+    <h2>Laps</h2>
+    <div style="display:flex;gap:.5rem">
+      <button id="compare-btn" class="btn btn-secondary btn-sm hidden" onclick="compareSelected()">Compare selected</button>
+    </div>
+  </div>
+  <div id="laps-container"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SESSION_ID = {{ session_id }};
+let sessionData = null;
+
+async function load() {
+  const [sessRes, lapsRes, carsRes] = await Promise.all([
+    fetch(`/api/v1/sessions/${SESSION_ID}`, { headers: authHeaders() }),
+    fetch(`/api/v1/laps/session/${SESSION_ID}`, { headers: authHeaders() }),
+    fetch("/api/v1/cars/", { headers: authHeaders() }),
+  ]);
+  if (!sessRes.ok) { document.getElementById("session-header").innerHTML = "<p>Session not found or access denied.</p>"; return; }
+
+  sessionData = await sessRes.json();
+  const laps = lapsRes.ok ? await lapsRes.json() : [];
+  const cars = carsRes.ok ? await carsRes.json() : [];
+
+  renderHeader(sessionData, cars);
+  renderLaps(laps, sessionData);
+}
+
+function renderHeader(s, cars) {
+  const carName = cars.find(c => c.id === s.car_id);
+  document.getElementById("session-header").innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem">
+      <div>
+        <h1>${s.session_type.charAt(0).toUpperCase()+s.session_type.slice(1)}</h1>
+        <p class="muted">${new Date(s.date).toLocaleString()}</p>
+        ${carName ? `<p>Car: <strong>${carName.make} ${carName.model}${carName.year?' ('+carName.year+')':''}</strong></p>` : ""}
+        ${s.vehicle_hint ? `<p class="muted">From file: ${s.vehicle_hint}</p>` : ""}
+        ${s.notes ? `<p style="margin-top:.5rem">${s.notes}</p>` : ""}
+        <span class="badge ${s.is_public ? 'badge-active':''}">
+          ${s.is_public ? "Public" : "Private"}
+        </span>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="openEdit(${JSON.stringify(s)}, ${JSON.stringify(cars)})">Edit</button>
+    </div>
+  `;
+
+  // Populate edit modal
+  document.getElementById("e-type").value = s.session_type;
+  document.getElementById("e-notes").value = s.notes || "";
+  document.getElementById("e-public").checked = s.is_public;
+  const carSel = document.getElementById("e-car");
+  carSel.innerHTML = '<option value="">— None —</option>' + cars.map(c =>
+    `<option value="${c.id}" ${c.id===s.car_id?'selected':''}>${c.make} ${c.model}${c.year?' ('+c.year+')':''}</option>`
+  ).join("");
+}
+
+function openEdit(s, cars) {
+  renderHeader(s, cars);
+  document.getElementById("edit-modal").showModal();
+}
+
+document.getElementById("edit-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const carId = document.getElementById("e-car").value;
+  const res = await fetch(`/api/v1/sessions/${SESSION_ID}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({
+      session_type: document.getElementById("e-type").value,
+      car_id: carId ? parseInt(carId) : null,
+      notes: document.getElementById("e-notes").value || null,
+      is_public: document.getElementById("e-public").checked,
+    }),
+  });
+  if (res.ok) {
+    document.getElementById("edit-modal").close();
+    load();
+  }
+});
+
+function renderLaps(laps, session) {
+  document.getElementById("laps-section").classList.remove("hidden");
+  const container = document.getElementById("laps-container");
+  if (!laps.length) {
+    container.innerHTML = "<p class='muted'>No laps yet — processing may still be in progress.</p>";
+    return;
+  }
+
+  const best = laps.filter(l=>l.is_valid&&l.lap_time_ms).sort((a,b)=>a.lap_time_ms-b.lap_time_ms)[0];
+
+  container.innerHTML = laps.map(l => {
+    const isBest = best && l.id === best.id;
+    return `
+    <div class="lap-row" style="flex-wrap:wrap;gap:.75rem">
+      <label style="display:flex;align-items:center;gap:.4rem;flex-direction:row;margin:0">
+        <input type="checkbox" class="compare-cb" value="${l.id}" onchange="updateCompareBtn()" style="width:auto" />
+      </label>
+      <span style="min-width:60px"><strong>Lap ${l.lap_number}</strong></span>
+      <span style="min-width:90px">${l.lap_time_display || "—"} ${isBest ? '<span class="badge badge-active">Best</span>' : ""}</span>
+      <span class="muted" style="min-width:100px">${l.max_speed_kmh ? l.max_speed_kmh.toFixed(1)+" km/h" : "—"}</span>
+      <span>
+        ${l.is_outlap ? '<span class="badge">Out</span>' : ""}
+        ${l.is_inlap ? '<span class="badge">In</span>' : ""}
+        ${!l.is_valid ? '<span class="badge badge-warn">Invalid</span>' : ""}
+      </span>
+      <a href="/laps/${l.id}" class="btn btn-secondary btn-sm">View</a>
+    </div>`;
+  }).join("");
+}
+
+function updateCompareBtn() {
+  const checked = document.querySelectorAll(".compare-cb:checked").length;
+  const btn = document.getElementById("compare-btn");
+  if (checked >= 2) {
+    btn.classList.remove("hidden");
+    btn.textContent = `Compare ${checked} laps`;
+  } else {
+    btn.classList.add("hidden");
+  }
+}
+
+function compareSelected() {
+  const ids = [...document.querySelectorAll(".compare-cb:checked")].map(cb => cb.value);
+  window.location.href = `/compare?laps=${ids.join(",")}`;
+}
+
+load();
+</script>
+{% endblock %}

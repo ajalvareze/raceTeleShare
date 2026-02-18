@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Event — RaceTrace{% endblock %}
+{% block content %}
+<div id="event-header"><p>Loading…</p></div>
+<div id="event-actions"></div>
+<h2>Leaderboard</h2>
+<div id="event-lb"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+const EVENT_ID = {{ event_id }};
+fetch(`/api/v1/events/${EVENT_ID}`, { headers: authHeaders() }).then(r=>r.json()).then(e => {
+  document.getElementById("event-header").innerHTML = `
+    <h1>${e.name} <span class="badge badge-${e.status}">${e.status}</span></h1>
+    <p class="muted">${new Date(e.date_start).toLocaleDateString()} — ${new Date(e.date_end).toLocaleDateString()}</p>
+    <p>${e.description || ""}</p>`;
+
+  const actions = document.getElementById("event-actions");
+  if (e.is_open && e.status !== "completed" && localStorage.getItem("access_token")) {
+    actions.innerHTML = `<button class="btn btn-primary" onclick="joinEvent()">Join Event</button>`;
+  }
+
+  const lb = document.getElementById("event-lb");
+  lb.innerHTML = e.leaderboard.length
+    ? `<table class="lb-table"><thead><tr><th>#</th><th>Driver</th><th>Best Lap</th></tr></thead><tbody>
+       ${e.leaderboard.map(r=>`<tr><td>${r.rank}</td><td>${r.username}</td><td><strong>${r.best_lap_display}</strong></td></tr>`).join("")}
+       </tbody></table>`
+    : "<p class='muted'>No laps submitted yet.</p>";
+});
+
+async function joinEvent() {
+  const res = await fetch(`/api/v1/events/${EVENT_ID}/join`, { method:"POST", headers: authHeaders() });
+  if (res.ok) alert("You joined the event! Upload a session and link it to this event.");
+  else { const e = await res.json(); alert(e.detail); }
+}
+</script>
+{% endblock %}

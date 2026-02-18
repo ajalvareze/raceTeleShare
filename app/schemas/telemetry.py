@@ -13,6 +13,7 @@ class TelemetryData(BaseModel):
     lap_time_ms: int | None = None
     sample_rate_hz: float | None = None
     channels: list[TelemetryChannel]
+    gps_track: list[list[float]] | None = None  # [[time, lat, lon, alt], ...]
 
 
 class LapDelta(BaseModel):

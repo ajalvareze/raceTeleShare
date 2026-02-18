@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard — RaceTrace{% endblock %}
+{% block content %}
+<div id="lb-header"><p>Loading…</p></div>
+<table class="lb-table" id="lb-table" style="display:none">
+  <thead><tr><th>#</th><th>Driver</th><th>Car</th><th>Best Lap</th><th>Top Speed</th><th>Date</th></tr></thead>
+  <tbody id="lb-body"></tbody>
+</table>
+{% endblock %}
+{% block scripts %}
+<script>
+const CONFIG_ID = {{ config_id }};
+fetch(`/api/v1/leaderboard/${CONFIG_ID}`).then(r=>r.json()).then(data => {
+  document.getElementById("lb-header").innerHTML = `
+    <h1>${data.track.name} <span class="muted">— ${data.configuration.name}</span></h1>
+    <p class="muted">${data.configuration.length_meters ? data.configuration.length_meters+"m" : ""}</p>`;
+  const tbody = document.getElementById("lb-body");
+  tbody.innerHTML = data.entries.map(e => `
+    <tr>
+      <td>${e.rank}</td>
+      <td><a href="/laps?user=${e.user.id}">${e.user.username}</a></td>
+      <td>${e.car || "—"}</td>
+      <td><strong>${e.best_lap_display}</strong></td>
+      <td>${e.top_speed_kmh ? e.top_speed_kmh.toFixed(1)+" km/h" : "—"}</td>
+      <td>${new Date(e.session_date).toLocaleDateString()}</td>
+    </tr>
+  `).join("");
+  if (data.entries.length) document.getElementById("lb-table").style.display="";
+  else document.getElementById("lb-body").innerHTML="<tr><td colspan='6'>No laps yet.</td></tr>";
+});
+</script>
+{% endblock %}
