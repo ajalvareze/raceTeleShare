@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Compare Laps — RaceTrace{% endblock %}
+
+{% block content %}
+<h1>Compare Laps</h1>
+
+<div class="compare-setup">
+  <label>Lap IDs (comma-separated)
+    <input type="text" id="lap-ids-input" placeholder="1,2,3" />
+  </label>
+  <button class="btn btn-primary" onclick="runCompare()">Compare</button>
+</div>
+
+<div id="delta-chart-wrap" class="hidden">
+  <h2>Delta-T</h2>
+  <canvas id="delta-canvas"></canvas>
+</div>
+
+<div id="channel-charts" class="chart-grid"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/compare.js"></script>
+<script>
+  // Pre-fill from query string
+  const params = new URLSearchParams(location.search);
+  if (params.get("laps")) {
+    document.getElementById("lap-ids-input").value = params.get("laps");
+  }
+</script>
+{% endblock %}

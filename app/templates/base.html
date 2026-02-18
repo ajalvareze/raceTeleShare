@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}RaceTrace{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/main.css" />
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <nav class="navbar">
+    <a class="nav-brand" href="/">RaceTrace</a>
+    <ul class="nav-links">
+      <li><a href="/laps">Laps</a></li>
+      <li><a href="/compare">Compare</a></li>
+    </ul>
+    <div class="nav-auth" id="nav-auth">
+      <a href="/login">Login</a>
+      <a href="/register">Register</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    // Inject stored token into nav if present
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      const authEl = document.getElementById("nav-auth");
+      authEl.innerHTML = '<button onclick="logout()">Logout</button>';
+    }
+    function logout() {
+      localStorage.removeItem("access_token");
+      window.location.href = "/";
+    }
+    function authHeaders() {
+      const t = localStorage.getItem("access_token");
+      return t ? { "Authorization": "Bearer " + t } : {};
+    }
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

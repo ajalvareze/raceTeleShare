@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Register — RaceTrace{% endblock %}
+
+{% block content %}
+<div class="form-page">
+  <h1>Register</h1>
+  <form id="register-form">
+    <label>Username <input type="text" id="username" required /></label>
+    <label>Email    <input type="email" id="email" required /></label>
+    <label>Full name <input type="text" id="full_name" /></label>
+    <label>Password <input type="password" id="password" required /></label>
+    <button type="submit" class="btn btn-primary">Create account</button>
+    <p>Already have an account? <a href="/login">Login</a></p>
+  </form>
+  <p id="error-msg" class="error hidden"></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById("register-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const res = await fetch("/api/v1/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: document.getElementById("username").value,
+        email: document.getElementById("email").value,
+        full_name: document.getElementById("full_name").value || null,
+        password: document.getElementById("password").value,
+      }),
+    });
+    if (res.ok) {
+      window.location.href = "/login";
+    } else {
+      const err = await res.json();
+      const msg = document.getElementById("error-msg");
+      msg.textContent = err.detail || "Registration failed";
+      msg.classList.remove("hidden");
+    }
+  });
+</script>
+{% endblock %}

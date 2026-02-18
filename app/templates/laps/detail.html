@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Lap {{ lap_id }} — RaceTrace{% endblock %}
+
+{% block content %}
+<div class="lap-detail">
+  <div id="lap-header"><p>Loading…</p></div>
+  <div class="chart-grid" id="chart-grid"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="/static/js/charts.js"></script>
+<script>
+  const LAP_ID = {{ lap_id }};
+
+  async function loadLap() {
+    const [lapRes, telRes] = await Promise.all([
+      fetch(`/api/v1/laps/${LAP_ID}`, { headers: authHeaders() }),
+      fetch(`/api/v1/laps/compare`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ lap_ids: [LAP_ID] }),
+      }),
+    ]);
+
+    const lap = await lapRes.json();
+    document.getElementById("lap-header").innerHTML = `
+      <h1>Lap ${lap.lap_number}</h1>
+      <p>Time: <strong>${lap.lap_time_display ?? "—"}</strong>
+         | Max speed: <strong>${lap.max_speed_kmh ? lap.max_speed_kmh.toFixed(1) + " km/h" : "—"}</strong>
+      </p>
+      <a href="/compare?laps=${LAP_ID}" class="btn btn-secondary">Compare with another lap</a>
+    `;
+
+    if (telRes.ok) {
+      const result = await telRes.json();
+      renderChannelCharts(result.laps[0], document.getElementById("chart-grid"));
+    }
+  }
+
+  loadLap();
+</script>
+{% endblock %}

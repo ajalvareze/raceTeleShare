@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}My Laps — RaceTrace{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Laps</h1>
+  <a href="#" class="btn btn-primary" onclick="showUploadModal()">+ Upload Lap</a>
+</div>
+
+<div id="sessions-container">
+  <p>Loading sessions…</p>
+</div>
+
+<!-- Upload modal (simplified) -->
+<dialog id="upload-modal">
+  <form id="upload-form">
+    <h2>Upload Telemetry</h2>
+    <label>Session ID <input type="number" id="u-session-id" required /></label>
+    <label>Lap number  <input type="number" id="u-lap-number" required /></label>
+    <label>Telemetry file <input type="file" id="u-file" accept=".csv,.json,.ld,.drk,.xdrk" required /></label>
+    <div class="modal-actions">
+      <button type="submit" class="btn btn-primary">Upload</button>
+      <button type="button" class="btn btn-secondary" onclick="document.getElementById('upload-modal').close()">Cancel</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/charts.js"></script>
+<script>
+  async function loadSessions() {
+    const res = await fetch("/api/v1/sessions/", { headers: authHeaders() });
+    if (!res.ok) { window.location.href = "/login"; return; }
+    const sessions = await res.json();
+    const container = document.getElementById("sessions-container");
+    if (!sessions.length) { container.innerHTML = "<p>No sessions yet. Upload your first lap!</p>"; return; }
+    container.innerHTML = sessions.map(s => `
+      <div class="session-card">
+        <h3>${s.session_type} — ${new Date(s.date).toLocaleDateString()}</h3>
+        <p>Track ID: ${s.track_id} ${s.is_public ? "🌐 Public" : "🔒 Private"}</p>
+        <a href="#" onclick="loadLaps(${s.id}, this.closest('.session-card'))">View laps</a>
+      </div>
+    `).join("");
+  }
+
+  async function loadLaps(sessionId, card) {
+    const res = await fetch(`/api/v1/laps/session/${sessionId}`, { headers: authHeaders() });
+    const laps = await res.json();
+    const lapHtml = laps.map(l => `
+      <div class="lap-row">
+        <span>Lap ${l.lap_number}</span>
+        <span>${l.lap_time_display ?? "—"}</span>
+        <span>${l.max_speed_kmh ? l.max_speed_kmh.toFixed(1) + " km/h" : "—"}</span>
+        <a href="/laps/${l.id}">Detail</a>
+        <label><input type="checkbox" class="compare-cb" value="${l.id}" /> Compare</label>
+      </div>
+    `).join("") || "<p>No laps in this session.</p>";
+    card.insertAdjacentHTML("beforeend", `<div class="laps-table">${lapHtml}</div>`);
+  }
+
+  function showUploadModal() {
+    document.getElementById("upload-modal").showModal();
+  }
+
+  document.getElementById("upload-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const lapRes = await fetch("/api/v1/laps/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({
+        session_id: parseInt(document.getElementById("u-session-id").value),
+        lap_number: parseInt(document.getElementById("u-lap-number").value),
+      }),
+    });
+    if (!lapRes.ok) { alert("Failed to create lap record"); return; }
+    const lap = await lapRes.json();
+
+    const fd = new FormData();
+    fd.append("file", document.getElementById("u-file").files[0]);
+    const upRes = await fetch(`/api/v1/laps/${lap.id}/upload`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: fd,
+    });
+    if (upRes.ok) {
+      document.getElementById("upload-modal").close();
+      loadSessions();
+    } else {
+      alert("Upload failed");
+    }
+  });
+
+  loadSessions();
+</script>
+{% endblock %}

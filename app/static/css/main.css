@@ -1,0 +1,83 @@
+/* ── Reset & base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --color-bg:       #0f1117;
+  --color-surface:  #1a1d27;
+  --color-border:   #2a2d3a;
+  --color-primary:  #e63946;
+  --color-text:     #e0e0e8;
+  --color-muted:    #7a7d90;
+  --radius:         8px;
+  --font:           "Inter", system-ui, sans-serif;
+}
+
+body { background: var(--color-bg); color: var(--color-text); font-family: var(--font); line-height: 1.6; }
+a    { color: var(--color-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Navbar ───────────────────────────────────────────────── */
+.navbar {
+  display: flex; align-items: center; gap: 1.5rem;
+  padding: .75rem 2rem;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+.nav-brand { font-weight: 700; font-size: 1.2rem; color: var(--color-primary); }
+.nav-links  { display: flex; gap: 1rem; list-style: none; margin-right: auto; }
+.nav-auth   { display: flex; gap: .75rem; }
+
+/* ── Container ───────────────────────────────────────────── */
+.container { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem; }
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn {
+  display: inline-block; padding: .5rem 1.25rem; border-radius: var(--radius);
+  font-weight: 600; cursor: pointer; border: none; font-size: .95rem;
+}
+.btn-primary   { background: var(--color-primary); color: #fff; }
+.btn-primary:hover { background: #c0303c; }
+.btn-secondary { background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); }
+.btn-secondary:hover { border-color: var(--color-primary); }
+
+/* ── Forms ───────────────────────────────────────────────── */
+.form-page { max-width: 420px; margin: 4rem auto; }
+.form-page h1 { margin-bottom: 1.5rem; }
+form label  { display: flex; flex-direction: column; gap: .25rem; margin-bottom: 1rem; font-size: .9rem; color: var(--color-muted); }
+form input  { padding: .5rem .75rem; border-radius: var(--radius); border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); font-size: 1rem; }
+form input:focus { outline: 2px solid var(--color-primary); }
+.error  { color: var(--color-primary); margin-top: .5rem; }
+.hidden { display: none; }
+
+/* ── Hero ────────────────────────────────────────────────── */
+.hero { text-align: center; padding: 5rem 1rem; }
+.hero h1 { font-size: 3rem; margin-bottom: 1rem; }
+.hero p  { font-size: 1.2rem; color: var(--color-muted); margin-bottom: 2rem; }
+.hero-actions { display: flex; gap: 1rem; justify-content: center; }
+
+/* ── Feature cards ───────────────────────────────────────── */
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-top: 4rem; }
+.feature-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1.5rem; }
+.feature-card h2 { margin-bottom: .5rem; }
+
+/* ── Session & lap cards ─────────────────────────────────── */
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+.session-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+.session-card h3 { margin-bottom: .25rem; }
+.laps-table { margin-top: .75rem; border-top: 1px solid var(--color-border); padding-top: .75rem; }
+.lap-row { display: flex; gap: 1.5rem; align-items: center; padding: .4rem 0; border-bottom: 1px solid var(--color-border); font-size: .9rem; }
+
+/* ── Charts ──────────────────────────────────────────────── */
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
+.chart-wrap { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1rem; }
+.chart-wrap h3 { margin-bottom: .5rem; font-size: .9rem; color: var(--color-muted); }
+
+/* ── Compare setup ───────────────────────────────────────── */
+.compare-setup { display: flex; gap: 1rem; align-items: flex-end; margin-bottom: 2rem; }
+.compare-setup label { display: flex; flex-direction: column; gap: .25rem; }
+.compare-setup input { padding: .5rem .75rem; border-radius: var(--radius); border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); font-size: 1rem; width: 260px; }
+
+/* ── Dialog ──────────────────────────────────────────────── */
+dialog { background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 2rem; min-width: 380px; }
+dialog h2 { margin-bottom: 1.25rem; }
+.modal-actions { display: flex; gap: .75rem; margin-top: 1rem; }

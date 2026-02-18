@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}RaceTrace — Racing Telemetry Platform{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <h1>RaceTrace</h1>
+  <p>Upload, share, and compare telemetry data from your racing sessions.</p>
+  <div class="hero-actions">
+    <a href="/register" class="btn btn-primary">Get Started</a>
+    <a href="/laps" class="btn btn-secondary">Browse Laps</a>
+  </div>
+</section>
+
+<section class="features">
+  <div class="feature-card">
+    <h2>Upload</h2>
+    <p>Support for CSV, JSON, MoTeC .ld, and AiM .drk telemetry formats.</p>
+  </div>
+  <div class="feature-card">
+    <h2>Share</h2>
+    <p>Make sessions public and share your fastest laps with the community.</p>
+  </div>
+  <div class="feature-card">
+    <h2>Compare</h2>
+    <p>Overlay channels, visualise delta-T graphs, and find where time is gained or lost.</p>
+  </div>
+</section>
+{% endblock %}
