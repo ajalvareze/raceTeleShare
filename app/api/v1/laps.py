@@ -13,7 +13,7 @@ from app.schemas.telemetry import CompareResult, TelemetryData, TelemetryChannel
 from app.services.storage import save_telemetry_file
 from app.services.telemetry.parser import parse
 from app.services.telemetry.processor import extract_lap_summary
-from app.services.telemetry.comparator import compare_laps
+from app.services.telemetry.comparator import compare_laps, speed_to_distance_m
 
 router = APIRouter(prefix="/laps", tags=["laps"])
 settings = get_settings()
@@ -73,12 +73,21 @@ def get_lap_telemetry(
         )
         for name, ch in lap_data["channels"].items()
     ]
+
+    # Compute cumulative distance from speed_gps (or speed_obd)
+    speed_ch = (lap_data["channels"].get("speed_gps")
+                or lap_data["channels"].get("speed_obd"))
+    distance_m: list[float] | None = None
+    if speed_ch and speed_ch.get("data") and speed_ch.get("timestamps"):
+        distance_m = speed_to_distance_m(speed_ch["timestamps"], speed_ch["data"])
+
     return TelemetryData(
         lap_id=lap.id,
         lap_time_ms=lap.lap_time_ms,
         sample_rate_hz=lap_data.get("sample_rate_hz"),
         channels=channels,
         gps_track=lap.gps_track or lap_data.get("gps_track"),
+        distance_m=distance_m,
     )
 
 

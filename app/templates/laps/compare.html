@@ -105,16 +105,19 @@ function renderResults(data, lapIds) {
     </div>
   `).join("");
 
-  // Delta-T chart
+  // Helper: format distance tick labels
+  const fmtDist = v => Math.round(v) + " m";
+
+  // Delta-T chart — x-axis is distance (m), y-axis is seconds
   if (data.deltas && data.deltas.length > 0) {
     if (deltaChart) { deltaChart.destroy(); deltaChart = null; }
+    const distAxis = data.deltas[0].timestamps; // metres
     deltaChart = new Chart(document.getElementById("delta-canvas"), {
       type: "line",
       data: {
-        labels: data.deltas[0].timestamps.map(t => t.toFixed(2)),
         datasets: data.deltas.map((d, i) => ({
           label: `Lap ${d.comparison_lap_id} vs ${d.reference_lap_id}`,
-          data: d.delta_seconds,
+          data: d.delta_seconds.map((v, j) => ({ x: distAxis[j], y: v })),
           borderColor: LAP_COLORS[(i + 1) % LAP_COLORS.length],
           borderWidth: 2,
           pointRadius: 0,
@@ -128,12 +131,18 @@ function renderResults(data, lapIds) {
           legend: { labels: { color: "#e0e0e8" } },
           tooltip: {
             callbacks: {
+              title: ctx => fmtDist(ctx[0].parsed.x),
               label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y > 0 ? "+" : ""}${ctx.parsed.y.toFixed(3)}s`,
             },
           },
         },
         scales: {
-          x: { ticks: { maxTicksLimit: 12, color: "#7a7d90" }, grid: { color: "#2a2d3a" } },
+          x: {
+            type: "linear",
+            title: { display: true, text: "Distance (m)", color: "#7a7d90" },
+            ticks: { maxTicksLimit: 12, color: "#7a7d90", callback: fmtDist },
+            grid: { color: "#2a2d3a" },
+          },
           y: {
             title: { display: true, text: "Delta (s)", color: "#7a7d90" },
             ticks: { color: "#7a7d90" },
@@ -144,11 +153,10 @@ function renderResults(data, lapIds) {
     });
   }
 
-  // Channel charts — one chart per channel, multiple laps overlaid
+  // Channel charts — one chart per channel, all laps overlaid, x = distance
   const container = document.getElementById("channel-charts");
   container.innerHTML = "";
 
-  // Collect all channel names, sorted by priority
   const allChannels = [...new Set(data.laps.flatMap(l => l.channels.map(c => c.name)))]
     .sort((a, b) => {
       const ai = CHANNEL_ORDER.indexOf(a);
@@ -157,13 +165,13 @@ function renderResults(data, lapIds) {
     });
 
   allChannels.forEach(chName => {
-    // Build datasets from all laps that have this channel
     const datasets = data.laps.flatMap((lap, i) => {
       const ch = lap.channels.find(c => c.name === chName);
       if (!ch) return [];
+      // ch.timestamps is already the common distance axis (metres)
       return [{
         label: `Lap ${lap.lap_id}`,
-        data: ch.data,
+        data: ch.data.map((v, j) => ({ x: ch.timestamps[j], y: v })),
         borderColor: LAP_COLORS[i % LAP_COLORS.length],
         borderWidth: 1.5,
         pointRadius: 0,
@@ -172,29 +180,26 @@ function renderResults(data, lapIds) {
     });
     if (!datasets.length) return;
 
-    const refCh = data.laps[0].channels.find(c => c.name === chName);
-    const timestamps = refCh ? refCh.timestamps : [];
-
     const card = document.createElement("div");
     card.className = "compare-channel-card";
-    const label = CHANNEL_LABELS[chName] || chName;
-    card.innerHTML = `<h3>${label}</h3><canvas></canvas>`;
+    card.innerHTML = `<h3>${CHANNEL_LABELS[chName] || chName}</h3><canvas></canvas>`;
     container.appendChild(card);
 
     new Chart(card.querySelector("canvas"), {
       type: "line",
-      data: {
-        labels: timestamps.map(t => t.toFixed(2)),
-        datasets,
-      },
+      data: { datasets },
       options: {
         animation: false,
         responsive: true,
-        plugins: { legend: { labels: { color: "#e0e0e8" } } },
+        plugins: {
+          legend: { labels: { color: "#e0e0e8" } },
+          tooltip: { callbacks: { title: ctx => fmtDist(ctx[0].parsed.x) } },
+        },
         scales: {
           x: {
-            title: { display: true, text: "Time (s)", color: "#7a7d90" },
-            ticks: { maxTicksLimit: 12, color: "#7a7d90" },
+            type: "linear",
+            title: { display: true, text: "Distance (m)", color: "#7a7d90" },
+            ticks: { maxTicksLimit: 12, color: "#7a7d90", callback: fmtDist },
             grid: { color: "#2a2d3a" },
           },
           y: {

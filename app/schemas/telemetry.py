@@ -5,7 +5,7 @@ class TelemetryChannel(BaseModel):
     name: str
     unit: str | None = None
     data: list[float]
-    timestamps: list[float]  # seconds from lap start
+    timestamps: list[float]  # x-axis: seconds (single lap) or meters (compare)
 
 
 class TelemetryData(BaseModel):
@@ -14,13 +14,14 @@ class TelemetryData(BaseModel):
     sample_rate_hz: float | None = None
     channels: list[TelemetryChannel]
     gps_track: list[list[float]] | None = None  # [[time, lat, lon, alt], ...]
+    distance_m: list[float] | None = None  # cumulative distance per sample (meters)
 
 
 class LapDelta(BaseModel):
-    """Time delta between two laps at each sample point."""
+    """Time delta between two laps at each distance point."""
     reference_lap_id: int
     comparison_lap_id: int
-    timestamps: list[float]  # distance or time axis
+    timestamps: list[float]  # distance axis (meters)
     delta_seconds: list[float]  # positive = comparison is slower
 
 

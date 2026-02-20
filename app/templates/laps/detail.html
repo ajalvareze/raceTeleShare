@@ -45,7 +45,8 @@ const CHANNEL_LABELS = {
   accel_vert: "Vertical G",
 };
 
-const CHANNEL_ORDER = ["speed_gps", "speed_obd", "throttle", "brake", "rpm", "accel_lat", "accel_lon", "accel_vert"];
+const CHANNEL_ORDER = ["speed_gps", "speed_obd", "throttle", "brake", "rpm", "accel_lat", "accel_lon"];
+const HIDDEN_CHANNELS = new Set(["manifold_pressure", "baro_pressure", "accel_vert", "heading", "altitude"]);
 
 async function loadLap() {
   const [lapRes, telRes] = await Promise.all([
@@ -86,7 +87,7 @@ async function loadLap() {
 
   const tel = await telRes.json();
   renderMap(tel.gps_track);
-  renderCharts(tel.channels);
+  renderCharts(tel.channels, tel.distance_m);
 }
 
 function renderMap(gpsTrack) {
@@ -107,15 +108,21 @@ function renderMap(gpsTrack) {
     .bindPopup("Start / Finish").addTo(map);
 }
 
-function renderCharts(channels) {
+function renderCharts(channels, distanceM) {
   const grid = document.getElementById("telemetry-grid");
   grid.innerHTML = "";
 
-  const sorted = [...channels].sort((a, b) => {
-    const ai = CHANNEL_ORDER.indexOf(a.name);
-    const bi = CHANNEL_ORDER.indexOf(b.name);
-    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-  });
+  // Use distance_m as x-axis if available, else fall back to time
+  const useDistance = distanceM && distanceM.length > 0;
+  const xLabel = useDistance ? "Distance (m)" : "Time (s)";
+
+  const sorted = channels
+    .filter(ch => !HIDDEN_CHANNELS.has(ch.name))
+    .sort((a, b) => {
+      const ai = CHANNEL_ORDER.indexOf(a.name);
+      const bi = CHANNEL_ORDER.indexOf(b.name);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
 
   sorted.forEach(ch => {
     const card = document.createElement("div");
@@ -125,12 +132,14 @@ function renderCharts(channels) {
     card.innerHTML = `<h3>${label}${unit ? " ("+unit+")" : ""}</h3><canvas></canvas>`;
     grid.appendChild(card);
 
+    // x values: distance array (same length as data), or timestamps
+    const xValues = useDistance ? distanceM : ch.timestamps;
+
     new Chart(card.querySelector("canvas"), {
       type: "line",
       data: {
-        labels: ch.timestamps,
         datasets: [{
-          data: ch.data,
+          data: ch.data.map((v, i) => ({ x: xValues[i], y: v })),
           borderColor: CHANNEL_COLORS[ch.name] || "#7a7d90",
           borderWidth: 1.5,
           pointRadius: 0,
@@ -144,8 +153,12 @@ function renderCharts(channels) {
         scales: {
           x: {
             type: "linear",
-            title: { display: true, text: "Time (s)", color: "#7a7d90" },
-            ticks: { maxTicksLimit: 12, color: "#7a7d90" },
+            title: { display: true, text: xLabel, color: "#7a7d90" },
+            ticks: {
+              maxTicksLimit: 12,
+              color: "#7a7d90",
+              callback: v => useDistance ? Math.round(v) + " m" : v.toFixed(1) + " s",
+            },
             grid: { color: "#2a2d3a" },
           },
           y: {
