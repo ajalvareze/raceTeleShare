@@ -85,6 +85,7 @@ def compare_laps(laps: list[Lap], channels: list[str] | None = None) -> CompareR
             lap_time_ms=lap.lap_time_ms,
             sample_rate_hz=data.get("sample_rate_hz"),
             channels=ch_list,
+            gps_track=lap.gps_track or data.get("gps_track"),
             distance_m=common_dist,
         ))
 

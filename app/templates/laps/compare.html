@@ -2,6 +2,7 @@
 {% block title %}Compare Laps — RaceTrace{% endblock %}
 
 {% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   .compare-channel-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; }
   .compare-channel-card h3 { font-size: .85rem; color: var(--color-muted); margin-bottom: .75rem; text-transform: uppercase; letter-spacing: .05em; }
@@ -10,12 +11,18 @@
   .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
   .delta-positive { color: #e9c46a; }
   .delta-negative { color: #2a9d8f; }
+  #compare-map { height: 380px; border-radius: var(--radius); border: 1px solid var(--color-border); margin-bottom: 1.5rem; background: var(--color-surface); }
 </style>
 {% endblock %}
 
-{% block content %}
-<h1>Compare Laps</h1>
+{% block page_hero %}
+<div class="page-hero page-hero--compare">
+  <h1>Compare Laps</h1>
+  <p class="hero-sub">Overlay traces side-by-side and find where time is gained</p>
+</div>
+{% endblock %}
 
+{% block content %}
 <div class="compare-setup">
   <label>Lap IDs (comma-separated)
     <input type="text" id="lap-ids-input" placeholder="1,2,3" />
@@ -25,6 +32,8 @@
 
 <div id="results" style="display:none">
   <div class="lap-legend" id="legend"></div>
+
+  <div id="compare-map" style="display:none"></div>
 
   <div class="compare-channel-card">
     <h3>Delta-T — time gained/lost vs reference lap</h3>
@@ -40,10 +49,12 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const LAP_COLORS = ["#e63946", "#457b9d", "#2a9d8f", "#e9c46a", "#f4a261", "#a8dadc"];
 
 const CHANNEL_ORDER = ["speed_gps", "speed_obd", "throttle", "brake", "rpm", "accel_lat", "accel_lon"];
+const HIDDEN_CHANNELS = new Set(["manifold_pressure", "baro_pressure", "accel_vert", "altitude"]);
 const CHANNEL_LABELS = {
   speed_gps: "Speed GPS (km/h)", speed_obd: "Speed OBD (km/h)",
   throttle: "Throttle (%)", brake: "Brake",
@@ -52,6 +63,7 @@ const CHANNEL_LABELS = {
 
 let deltaChart = null;
 const channelCharts = {};
+let compareMap = null;
 
 // Pre-fill from query string
 const params = new URLSearchParams(location.search);
@@ -104,6 +116,8 @@ function renderResults(data, lapIds) {
       ${i === 0 ? ' <span class="muted">(reference)</span>' : ""}
     </div>
   `).join("");
+
+  renderCompareMap(data.laps);
 
   // Helper: format distance tick labels
   const fmtDist = v => Math.round(v) + " m";
@@ -158,6 +172,7 @@ function renderResults(data, lapIds) {
   container.innerHTML = "";
 
   const allChannels = [...new Set(data.laps.flatMap(l => l.channels.map(c => c.name)))]
+    .filter(name => !HIDDEN_CHANNELS.has(name))
     .sort((a, b) => {
       const ai = CHANNEL_ORDER.indexOf(a);
       const bi = CHANNEL_ORDER.indexOf(b);
@@ -210,6 +225,44 @@ function renderResults(data, lapIds) {
       },
     });
   });
+}
+
+function renderCompareMap(laps) {
+  const mapEl = document.getElementById("compare-map");
+
+  const tracks = laps
+    .map((lap, i) => ({ gps: lap.gps_track, color: LAP_COLORS[i % LAP_COLORS.length], lapId: lap.lap_id }))
+    .filter(t => t.gps && t.gps.length >= 2);
+
+  if (!tracks.length) {
+    mapEl.style.display = "none";
+    return;
+  }
+  mapEl.style.display = "block";
+
+  if (compareMap) { compareMap.remove(); compareMap = null; }
+
+  compareMap = L.map("compare-map");
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap contributors",
+  }).addTo(compareMap);
+
+  const allLatLngs = [];
+  tracks.forEach(({ gps, color, lapId }) => {
+    const latlngs = gps.map(p => [p[1], p[2]]);
+    allLatLngs.push(...latlngs);
+    L.polyline(latlngs, { color, weight: 2.5, opacity: 0.9 })
+      .bindTooltip(`Lap ${lapId}`, { sticky: true })
+      .addTo(compareMap);
+  });
+
+  compareMap.fitBounds(L.latLngBounds(allLatLngs), { padding: [20, 20] });
+
+  // Start / Finish marker from the reference lap
+  const ref = tracks[0].gps[0];
+  L.circleMarker([ref[1], ref[2]], {
+    radius: 7, color: "#fff", fillColor: "#fff", fillOpacity: 0.9,
+  }).bindPopup("Start / Finish").addTo(compareMap);
 }
 </script>
 {% endblock %}

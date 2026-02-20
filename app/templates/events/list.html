@@ -1,8 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Events — RaceTrace{% endblock %}
+{% block page_hero %}
+<div class="page-hero page-hero--events">
+  <h1>Events</h1>
+  <p class="hero-sub">Trackday competitions &amp; community challenges</p>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-  <h1>Events</h1>
+  <span></span>
   <a href="#" class="btn btn-primary" id="create-btn" style="display:none">+ Create Event</a>
 </div>
 <div id="events-container"><p>Loading…</p></div>

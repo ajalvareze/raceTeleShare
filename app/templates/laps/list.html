@@ -1,9 +1,16 @@
 {% extends "base.html" %}
 {% block title %}My Laps — RaceTrace{% endblock %}
 
+{% block page_hero %}
+<div class="page-hero page-hero--laps">
+  <h1>Laps</h1>
+  <p class="hero-sub">All your recorded laps</p>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-  <h1>Laps</h1>
+  <span></span>
   <a href="#" class="btn btn-primary" onclick="showUploadModal()">+ Upload Lap</a>
 </div>
 

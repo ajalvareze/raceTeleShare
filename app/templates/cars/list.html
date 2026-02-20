@@ -1,9 +1,16 @@
 {% extends "base.html" %}
 {% block title %}My Cars — RaceTrace{% endblock %}
 
+{% block page_hero %}
+<div class="page-hero page-hero--cars">
+  <h1>My Cars</h1>
+  <p class="hero-sub">Manage your garage</p>
+</div>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-  <h1>My Cars</h1>
+  <span></span>
   <button class="btn btn-primary" onclick="openAdd()">+ Add Car</button>
 </div>
 

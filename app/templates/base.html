@@ -4,12 +4,31 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}RaceTrace{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" />
   <link rel="stylesheet" href="/static/css/main.css" />
   {% block head %}{% endblock %}
 </head>
 <body>
   <nav class="navbar">
-    <a class="nav-brand" href="/">RaceTrace</a>
+    <a class="nav-logo" href="/">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- Chequered flag silhouette -->
+        <rect width="4" height="4" x="2" y="2" fill="#e63946" fill-opacity=".9"/>
+        <rect width="4" height="4" x="10" y="2" fill="#e63946" fill-opacity=".9"/>
+        <rect width="4" height="4" x="6" y="6" fill="#e63946" fill-opacity=".9"/>
+        <rect width="4" height="4" x="14" y="6" fill="#e63946" fill-opacity=".9"/>
+        <rect width="4" height="4" x="2" y="10" fill="#e63946" fill-opacity=".9"/>
+        <rect width="4" height="4" x="10" y="10" fill="#e63946" fill-opacity=".9"/>
+        <!-- Flag pole -->
+        <rect x="2" y="2" width="2" height="24" fill="#e2e4ef" fill-opacity=".7" rx="1"/>
+        <!-- Speed line accent -->
+        <path d="M18 20 Q22 17 26 20" stroke="#e63946" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <path d="M16 23 Q21 20 26 23" stroke="#e63946" stroke-width="1.5" stroke-linecap="round" fill="none" opacity=".6"/>
+      </svg>
+      <span class="nav-logo-text"><span class="race">Race</span><span class="trace">Trace</span></span>
+    </a>
     <ul class="nav-links">
       <li><a href="/tracks">Tracks</a></li>
       <li><a href="/events">Events</a></li>
@@ -22,6 +41,8 @@
       <a href="/register" class="btn btn-primary btn-sm">Sign up</a>
     </div>
   </nav>
+
+  {% block page_hero %}{% endblock %}
 
   <main class="container">
     {% block content %}{% endblock %}

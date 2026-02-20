@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Tracks — RaceTrace{% endblock %}
+{% block page_hero %}
+<div class="page-hero page-hero--tracks">
+  <h1>Tracks</h1>
+  <p class="hero-sub">Circuits, configurations &amp; leaderboards</p>
+</div>
+{% endblock %}
+
 {% block content %}
-<h1>Tracks</h1>
 <div id="tracks-container"><p>Loading…</p></div>
 {% endblock %}
 {% block scripts %}

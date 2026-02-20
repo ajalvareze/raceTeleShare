@@ -1,5 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Leaderboard — RaceTrace{% endblock %}
+{% block page_hero %}
+<div class="page-hero page-hero--leaderboard">
+  <h1>Leaderboard</h1>
+  <p class="hero-sub">The fastest laps on record</p>
+</div>
+{% endblock %}
+
 {% block content %}
 <div id="lb-header"><p>Loading…</p></div>
 <table class="lb-table" id="lb-table" style="display:none">

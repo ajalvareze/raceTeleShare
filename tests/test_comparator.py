@@ -58,6 +58,7 @@ class MockLap:
         self.telemetry_file_path = file_path
         self.telemetry_format = fmt
         self.lap_time_ms = lap_time_ms
+        self.gps_track = None
 
 
 @pytest.fixture(scope="module")
