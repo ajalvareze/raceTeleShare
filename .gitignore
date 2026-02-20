@@ -33,3 +33,10 @@ htmlcov/
 
 # Alembic
 alembic/versions/*.pyc
+
+# Environment files — actual values are never committed
+# Copy the matching .example file and fill in your values
+.env.development
+.env.testing
+.env.production
+# .env.*.example files ARE committed — they are safe templates

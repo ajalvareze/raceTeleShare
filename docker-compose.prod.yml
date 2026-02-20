@@ -1,0 +1,44 @@
+version: "3.11"
+# ── Production ────────────────────────────────────────────────────────────────
+# Usage: docker compose -f docker-compose.prod.yml up -d
+# Requires: .env.production (copy from .env.production.example, fill in all values)
+
+services:
+  db:
+    image: postgres:16-alpine
+    env_file: .env.production    # provides POSTGRES_USER / PASSWORD / DB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # NOT exposed to host — only reachable within the docker network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U racetrace"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # NOT exposed to host
+    restart: unless-stopped
+
+  app:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    volumes:
+      - uploads:/data/uploads
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: production
+    env_file: .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  uploads:

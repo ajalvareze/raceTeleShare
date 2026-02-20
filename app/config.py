@@ -1,8 +1,15 @@
-from pydantic_settings import BaseSettings
+import os
 from functools import lru_cache
+from pydantic_settings import BaseSettings
+
+# Selects which .env.* file to load when running outside Docker.
+# In Docker the env file is injected by docker-compose via env_file:,
+# so APP_ENV is only needed for bare uvicorn / alembic runs on the host.
+_app_env = os.getenv("APP_ENV", "development")
 
 
 class Settings(BaseSettings):
+    app_env: str = _app_env
     app_name: str = "RaceTrace"
     app_version: str = "0.1.0"
     debug: bool = False
@@ -36,7 +43,8 @@ class Settings(BaseSettings):
     allowed_origins: list[str] = ["http://localhost:3000", "http://localhost:8000"]
 
     class Config:
-        env_file = ".env"
+        env_file = f".env.{_app_env}"
+        env_file_encoding = "utf-8"
 
 
 @lru_cache

@@ -6,7 +6,13 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import all models so Alembic can detect them
+# Override the sqlalchemy.url from alembic.ini with the value resolved
+# by the app settings (reads APP_ENV → .env.{env} → DATABASE_URL).
+# This ensures alembic always targets the same database as the running app.
+from app.config import get_settings  # noqa: E402
+config.set_main_option("sqlalchemy.url", get_settings().database_url)
+
+# Import all models so Alembic can detect schema changes
 from app.database import Base  # noqa: F401
 import app.models  # noqa: F401
 
